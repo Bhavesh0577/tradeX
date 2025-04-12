@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Custom styles for search input */
+.search-input {
+  color: white !important;
+  background-color: rgba(30, 30, 30, 0.7) !important;
+  border-color: #333 !important;
+}
+
+.search-input::placeholder {
+  color: #aaa !important;
+}
+
+.search-input:focus {
+  border-color: #666 !important;
+  background-color: rgba(40, 40, 40, 0.8) !important;
+}
