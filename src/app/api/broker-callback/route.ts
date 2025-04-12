@@ -1,5 +1,5 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { clerkClient } from "@clerk/nextjs/server";
+import { NextRequest, NextResponse } from 'next/server';
+import { clerkClient } from '@clerk/nextjs/server';
 
 // Function to exchange auth code for token with broker APIs
 async function getAccessToken(brokerId: string, code: string): Promise<any> {
@@ -59,25 +59,44 @@ async function getAccessToken(brokerId: string, code: string): Promise<any> {
     }
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-    // This should be a GET request from the broker's OAuth callback
-    if (req.method !== 'GET') {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+// Function to send real-time notification to other devices
+async function notifyOtherDevices(userId: string, message: string): Promise<void> {
+    // In a real app, you would use a service like Pusher, Socket.io, etc.
+    // For this demo, we'll simulate it
+    console.log(`[NOTIFICATION] User ${userId}: ${message}`);
+}
 
+export async function GET(request: NextRequest) {
     try {
-        const { code, brokerId, userId } = req.query;
+        // Extract query parameters
+        const searchParams = request.nextUrl.searchParams;
+        const code = searchParams.get('code');
+        const brokerId = searchParams.get('brokerId');
+        const userId = searchParams.get('userId');
+        const sessionId = searchParams.get('sessionId');
 
-        if (!code || !brokerId || !userId || Array.isArray(code) || Array.isArray(brokerId) || Array.isArray(userId)) {
-            return res.status(400).json({ error: 'Missing required parameters' });
+        if (!code || !brokerId || !userId || !sessionId) {
+            return NextResponse.redirect(new URL('/trading/error?message=Missing required parameters', request.url));
         }
 
         // Exchange authorization code for access token
         const tokenResponse = await getAccessToken(brokerId, code);
 
         if (!tokenResponse.access_token) {
-            throw new Error('Failed to get access token');
+            return NextResponse.redirect(new URL('/trading/error?message=Failed to get access token', request.url));
         }
+
+        // Update the session status
+        await clerkClient().then(client => client.users.updateUserMetadata(userId, {
+            privateMetadata: {
+                brokerSessions: {
+                    [sessionId]: {
+                        status: 'completed',
+                        completedAt: new Date().toISOString()
+                    }
+                }
+            }
+        }));
 
         // Store the token in user metadata (encrypted in a real production system)
         await clerkClient().then(client => client.users.updateUserMetadata(userId, {
@@ -102,12 +121,52 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             }
         }));
 
-        // Redirect back to the app
-        res.redirect(302, '/trading/automated');
+        // Send notification to other devices about successful connection
+        await notifyOtherDevices(userId, `${brokerId} broker connected successfully`);
+
+        // Redirect based on device type
+        const userAgent = request.headers.get('user-agent') || '';
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(userAgent);
+
+        if (isMobile) {
+            // For mobile, try to open the app via deep link if possible
+            const appDeepLink = `tradex://broker-connected?status=success&broker=${brokerId}`;
+
+            // Use JavaScript to attempt opening the app, and fall back to web if it fails
+            return new NextResponse(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Broker Connected</title>
+            <script>
+              // Try to open the app
+              window.location.href = "${appDeepLink}";
+              
+              // If app doesn't open within 1 second, redirect to web
+              setTimeout(function() {
+                window.location.href = "${process.env.NEXT_PUBLIC_APP_URL}/trading/automated";
+              }, 1000);
+            </script>
+          </head>
+          <body>
+            <p>Redirecting back to the app...</p>
+          </body>
+        </html>
+      `, {
+                headers: {
+                    'Content-Type': 'text/html',
+                },
+            });
+        } else {
+            // For desktop browsers, redirect to the automated trading page
+            return NextResponse.redirect(new URL('/trading/automated', request.url));
+        }
 
     } catch (error) {
         console.error('Error processing broker callback:', error);
         // Redirect to error page
-        res.redirect(302, '/trading/error?message=Failed to connect broker');
+        return NextResponse.redirect(new URL('/trading/error?message=Failed to connect broker', request.url));
     }
 } 

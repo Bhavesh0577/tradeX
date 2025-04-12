@@ -115,9 +115,9 @@ export default function Page() {
               <BarChart3 className="h-4 w-4" />
               Intraday Strategy
             </Button>
-            <Button variant="ghost" className="w-full justify-start gap-2">
+            <Button variant="ghost" className="w-full justify-start gap-2" onClick={() => window.location.href = '/trading/automated'}>
               <Globe className="h-4 w-4" />
-              Market
+              Automated Trading
             </Button>
             <Button variant="ghost" className="w-full justify-start gap-2">
               <Home className="h-4 w-4" />
