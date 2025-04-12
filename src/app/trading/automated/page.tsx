@@ -40,7 +40,6 @@ import {
     ArrowUpRightFromCircle,
     BarChart2
 } from "lucide-react";
-import { ConnectBroker } from "@/components/broker/connect-broker";
 
 // Types
 interface BrokerConnection {
@@ -350,64 +349,541 @@ export default function AutomatedTradingPage() {
                 </div>
 
                 <Tabs defaultValue="overview" className="w-full">
-                    <TabsList className="grid w-full grid-cols-3">
+                    <TabsList className="grid w-full grid-cols-4">
                         <TabsTrigger value="overview">Overview</TabsTrigger>
-                        <TabsTrigger value="connect">Connect Broker</TabsTrigger>
-                        <TabsTrigger value="settings">Settings</TabsTrigger>
+                        <TabsTrigger value="brokers">Broker Integration</TabsTrigger>
+                        <TabsTrigger value="settings">Automation Settings</TabsTrigger>
+                        <TabsTrigger value="history">Trade History</TabsTrigger>
                     </TabsList>
 
                     {/* Overview Tab */}
                     <TabsContent value="overview" className="space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium">Automation Status</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center space-x-2">
+                                            {automationSettings.enabled ? (
+                                                <>
+                                                    <Badge className="bg-green-500">Active</Badge>
+                                                    <span className="text-sm text-muted-foreground">Trading enabled</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Badge variant="outline">Disabled</Badge>
+                                                    <span className="text-sm text-muted-foreground">Trading disabled</span>
+                                                </>
+                                            )}
+                                        </div>
+                                        <Switch
+                                            checked={automationSettings.enabled}
+                                            onCheckedChange={toggleAutomation}
+                                        />
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium">Connected Brokers</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {brokerConnections.filter(b => b.connected).length > 0 ? (
+                                            brokerConnections
+                                                .filter(b => b.connected)
+                                                .map(broker => (
+                                                    <div key={broker.id} className="flex items-center justify-between">
+                                                        <div className="flex items-center space-x-2">
+                                                            <Badge className="bg-blue-500">{broker.name}</Badge>
+                                                            <span className="text-xs text-muted-foreground">
+                                                                Connected {broker.connectedAt ? new Date(broker.connectedAt).toLocaleDateString() : ''}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                        ) : (
+                                            <div className="flex items-center space-x-2 text-muted-foreground">
+                                                <AlertTriangle className="h-4 w-4" />
+                                                <span>No brokers connected</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => document.querySelector('[data-value="brokers"]')?.dispatchEvent(new MouseEvent('click'))}
+                                    >
+                                        Manage connections
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium">AI Analysis</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-2">
+                                        {signals.length > 0 ? (
+                                            <div className="text-sm">
+                                                <div>Signals analyzed: {signals.length}</div>
+                                                <div>Buy signals: {signals.filter(s => s.action === 'BUY').length}</div>
+                                                <div>Sell signals: {signals.filter(s => s.action === 'SELL').length}</div>
+                                            </div>
+                                        ) : (
+                                            <div className="flex items-center space-x-2 text-muted-foreground">
+                                                <BarChart2 className="h-4 w-4" />
+                                                <span>No signals analyzed yet</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                                <CardFooter>
+                                    <Button
+                                        size="sm"
+                                        onClick={getAISignals}
+                                        disabled={loadingSignals}
+                                    >
+                                        {loadingSignals ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                Analyzing...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <RefreshCw className="h-4 w-4 mr-2" />
+                                                Analyze Now
+                                            </>
+                                        )}
+                                    </Button>
+                                </CardFooter>
+                            </Card>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Watchlist */}
+                            <Card className="col-span-1">
+                                <CardHeader>
+                                    <CardTitle>Watchlist</CardTitle>
+                                    <CardDescription>Stocks being monitored by the AI agent</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-4">
+                                        <div className="flex space-x-2">
+                                            <Input
+                                                placeholder="Add symbol (e.g. TATASTEEL.NS)"
+                                                value={newSymbol}
+                                                onChange={(e) => setNewSymbol(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && addToWatchlist()}
+                                            />
+                                            <Button onClick={addToWatchlist} size="icon">
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Symbol</TableHead>
+                                                    <TableHead>Name</TableHead>
+                                                    <TableHead>Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {watchlist.map((item) => (
+                                                    <TableRow key={item.symbol}>
+                                                        <TableCell className="font-medium">{item.symbol}</TableCell>
+                                                        <TableCell>{item.name}</TableCell>
+                                                        <TableCell>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                onClick={() => removeFromWatchlist(item.symbol)}
+                                                            >
+                                                                <Trash className="h-4 w-4 text-destructive" />
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* AI Signals */}
+                            <Card className="col-span-1">
+                                <CardHeader>
+                                    <CardTitle>AI Trading Signals</CardTitle>
+                                    <CardDescription>Recent trading recommendations from the AI</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    {signals.length > 0 ? (
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Symbol</TableHead>
+                                                    <TableHead>Action</TableHead>
+                                                    <TableHead>Price</TableHead>
+                                                    <TableHead>Confidence</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {signals.map((signal) => (
+                                                    <TableRow key={signal.symbol}>
+                                                        <TableCell className="font-medium">{signal.symbol}</TableCell>
+                                                        <TableCell>
+                                                            {signal.action === 'BUY' ? (
+                                                                <Badge className="bg-green-500 flex items-center w-16 justify-center">
+                                                                    <TrendingUp className="h-3 w-3 mr-1" />
+                                                                    BUY
+                                                                </Badge>
+                                                            ) : signal.action === 'SELL' ? (
+                                                                <Badge className="bg-red-500 flex items-center w-16 justify-center">
+                                                                    <TrendingDown className="h-3 w-3 mr-1" />
+                                                                    SELL
+                                                                </Badge>
+                                                            ) : (
+                                                                <Badge variant="outline" className="flex items-center w-16 justify-center">
+                                                                    HOLD
+                                                                </Badge>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>₹{signal.price.toFixed(2)}</TableCell>
+                                                        <TableCell>{(signal.confidence * 100).toFixed(0)}%</TableCell>
+                                                    </TableRow>
+                                                ))}
+                                            </TableBody>
+                                        </Table>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center p-6 text-center">
+                                            <div className="rounded-full p-3 bg-muted mb-4">
+                                                <BarChart2 className="h-6 w-6 text-muted-foreground" />
+                                            </div>
+                                            <h3 className="text-lg font-medium mb-2">No signals yet</h3>
+                                            <p className="text-sm text-muted-foreground mb-4">
+                                                Click 'Analyze Now' to get the latest trading signals from our AI
+                                            </p>
+                                            <Button
+                                                onClick={getAISignals}
+                                                disabled={loadingSignals}
+                                            >
+                                                {loadingSignals ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                        Analyzing...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <RefreshCw className="h-4 w-4 mr-2" />
+                                                        Analyze Now
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    {/* Broker Integration Tab */}
+                    <TabsContent value="brokers" className="space-y-4">
                         <Card>
                             <CardHeader>
                                 <CardTitle>Connect Your Broker</CardTitle>
-                                <CardDescription>
-                                    First, connect your broker account to enable automated trading
-                                </CardDescription>
+                                <CardDescription>Link your trading account to enable automated trading</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-center p-6">
-                                    <p className="mb-4">
-                                        To get started with automated trading, you need to connect your broker account.
-                                    </p>
-                                    <Button onClick={() => document.querySelector('[data-value="connect"]')?.dispatchEvent(new MouseEvent('click'))}>
-                                        Connect Broker
-                                    </Button>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-1 gap-4">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="broker-select">Select Broker</Label>
+                                            <Select value={selectedBroker} onValueChange={setSelectedBroker}>
+                                                <SelectTrigger id="broker-select">
+                                                    <SelectValue placeholder="Select a broker" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {SUPPORTED_BROKERS.map(broker => (
+                                                        <SelectItem key={broker.id} value={broker.id}>
+                                                            {broker.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <Button
+                                            onClick={() => connectBroker(selectedBroker)}
+                                            disabled={!selectedBroker || isConnecting}
+                                        >
+                                            {isConnecting ? (
+                                                <>
+                                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                    Connecting...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <ConeIcon className="h-4 w-4 mr-2" />
+                                                    Connect Broker
+                                                </>
+                                            )}
+                                        </Button>
+                                    </div>
+
+                                    <div className="pt-4 border-t">
+                                        <h3 className="text-lg font-medium mb-2">Connected Brokers</h3>
+
+                                        {brokerConnections.length > 0 ? (
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Broker</TableHead>
+                                                        <TableHead>Status</TableHead>
+                                                        <TableHead>Connected Since</TableHead>
+                                                        <TableHead>Actions</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {brokerConnections.map(broker => (
+                                                        <TableRow key={broker.id}>
+                                                            <TableCell className="font-medium">{broker.name}</TableCell>
+                                                            <TableCell>
+                                                                {broker.connected ? (
+                                                                    <Badge className="bg-green-500">Connected</Badge>
+                                                                ) : (
+                                                                    <Badge variant="outline">Disconnected</Badge>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {broker.connectedAt
+                                                                    ? new Date(broker.connectedAt).toLocaleDateString()
+                                                                    : 'N/A'
+                                                                }
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {broker.connected ? (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => disconnectBroker(broker.id)}
+                                                                    >
+                                                                        Disconnect
+                                                                    </Button>
+                                                                ) : (
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        onClick={() => connectBroker(broker.id)}
+                                                                    >
+                                                                        Reconnect
+                                                                    </Button>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        ) : (
+                                            <div className="text-center p-4 bg-muted rounded-md">
+                                                <p className="text-muted-foreground">No brokers connected yet</p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
                     </TabsContent>
 
-                    {/* Connect Broker Tab */}
-                    <TabsContent value="connect" className="space-y-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Connect Your Broker</CardTitle>
-                                <CardDescription>
-                                    Link your trading account to enable automated trading
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <ConnectBroker />
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* Settings Tab */}
+                    {/* Automation Settings Tab */}
                     <TabsContent value="settings" className="space-y-4">
                         <Card>
                             <CardHeader>
-                                <CardTitle>Trading Settings</CardTitle>
-                                <CardDescription>
-                                    Configure your automated trading parameters
-                                </CardDescription>
+                                <CardTitle>Trading Parameters</CardTitle>
+                                <CardDescription>Configure how the AI agent will trade</CardDescription>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-center p-6">
-                                    <p>
-                                        Please connect your broker first to access trading settings.
-                                    </p>
+                                <div className="space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <div className="space-y-0.5">
+                                            <Label htmlFor="automation-enabled">Automated Trading</Label>
+                                            <p className="text-sm text-muted-foreground">
+                                                Enable or disable the AI trading agent
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            id="automation-enabled"
+                                            checked={automationSettings.enabled}
+                                            onCheckedChange={toggleAutomation}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label htmlFor="broker-select">Trading Broker</Label>
+                                        <Select
+                                            value={automationSettings.brokerId}
+                                            onValueChange={(value) => updateAutomationSettings('brokerId', value)}
+                                            disabled={!brokerConnections.some(b => b.connected)}
+                                        >
+                                            <SelectTrigger id="broker-select">
+                                                <SelectValue placeholder="Select a connected broker" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {brokerConnections
+                                                    .filter(b => b.connected)
+                                                    .map(broker => (
+                                                        <SelectItem key={broker.id} value={broker.id}>
+                                                            {broker.name}
+                                                        </SelectItem>
+                                                    ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {!brokerConnections.some(b => b.connected) && (
+                                            <p className="text-sm text-muted-foreground mt-1">
+                                                Please connect a broker first in the Broker Integration tab.
+                                            </p>
+                                        )}
+                                    </div>
+
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label htmlFor="check-interval">Check Interval (minutes)</Label>
+                                            <Input
+                                                id="check-interval"
+                                                type="number"
+                                                value={automationSettings.interval}
+                                                onChange={(e) => updateAutomationSettings('interval', parseInt(e.target.value))}
+                                                min={1}
+                                                max={60}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                How often the AI checks for trading opportunities
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="max-trades">Max Trades Per Day</Label>
+                                            <Input
+                                                id="max-trades"
+                                                type="number"
+                                                value={automationSettings.maxTradesPerDay}
+                                                onChange={(e) => updateAutomationSettings('maxTradesPerDay', parseInt(e.target.value))}
+                                                min={1}
+                                                max={50}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Limit the number of trades the AI can make per day
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="investment-amount">Investment Per Trade (₹)</Label>
+                                            <Input
+                                                id="investment-amount"
+                                                type="number"
+                                                value={automationSettings.investmentPerTrade}
+                                                onChange={(e) => updateAutomationSettings('investmentPerTrade', parseInt(e.target.value))}
+                                                min={100}
+                                                step={100}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Amount to invest in each automated trade
+                                            </p>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label htmlFor="confidence-threshold">Confidence Threshold (%)</Label>
+                                            <Input
+                                                id="confidence-threshold"
+                                                type="number"
+                                                value={automationSettings.confidenceThreshold * 100}
+                                                onChange={(e) => updateAutomationSettings('confidenceThreshold', parseInt(e.target.value) / 100)}
+                                                min={50}
+                                                max={95}
+                                                step={5}
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                Minimum confidence level required for AI to execute trades
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
+                            </CardContent>
+                            <CardFooter className="flex justify-between">
+                                <Button variant="outline">Reset to Defaults</Button>
+                                <Button
+                                    disabled={!automationSettings.brokerId}
+                                >
+                                    Save Settings
+                                </Button>
+                            </CardFooter>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Trade History Tab */}
+                    <TabsContent value="history" className="space-y-4">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Trading History</CardTitle>
+                                <CardDescription>Record of trades executed by the AI agent</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                {tradesHistory.length > 0 ? (
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Date & Time</TableHead>
+                                                <TableHead>Symbol</TableHead>
+                                                <TableHead>Type</TableHead>
+                                                <TableHead>Price</TableHead>
+                                                <TableHead>Quantity</TableHead>
+                                                <TableHead>Status</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {tradesHistory.map((trade, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell>{new Date(trade.timestamp).toLocaleString()}</TableCell>
+                                                    <TableCell className="font-medium">{trade.symbol}</TableCell>
+                                                    <TableCell>
+                                                        {trade.type === 'BUY' ? (
+                                                            <Badge className="bg-green-500">BUY</Badge>
+                                                        ) : (
+                                                            <Badge className="bg-red-500">SELL</Badge>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>₹{trade.price.toFixed(2)}</TableCell>
+                                                    <TableCell>{trade.quantity}</TableCell>
+                                                    <TableCell>
+                                                        {trade.status === 'COMPLETED' ? (
+                                                            <Badge className="bg-green-500">Completed</Badge>
+                                                        ) : trade.status === 'PENDING' ? (
+                                                            <Badge variant="outline">Pending</Badge>
+                                                        ) : (
+                                                            <Badge variant="destructive">Failed</Badge>
+                                                        )}
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center p-6 text-center">
+                                        <div className="rounded-full p-3 bg-muted mb-4">
+                                            <Activity className="h-6 w-6 text-muted-foreground" />
+                                        </div>
+                                        <h3 className="text-lg font-medium mb-2">No trading history</h3>
+                                        <p className="text-sm text-muted-foreground">
+                                            Once the AI agent starts trading, your history will appear here
+                                        </p>
+                                    </div>
+                                )}
                             </CardContent>
                         </Card>
                     </TabsContent>
