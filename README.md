@@ -29,6 +29,42 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Trading Models and Features
+
+This project includes advanced trading capabilities:
+
+### 1. Trading Ensemble Model
+- Located in `src/lib/ml/tradingModel.ts`
+- Combines multiple ML models (Random Forest, Gradient Boosting, Neural Network, etc.) for more accurate predictions
+- Weighs models based on historical performance and generates trading signals
+
+### 2. Backtesting Module
+- Located in `src/lib/trading/backtesting.ts`
+- Validates trading strategies against historical data
+- Provides comprehensive performance metrics (returns, drawdowns, Sharpe ratio, etc.)
+- Simulates real-world trading conditions with slippage and commissions
+
+### 3. Sentiment Analysis Module
+- Located in `src/lib/ml/sentimentAnalysis.ts`
+- Analyzes news articles and social media posts for market sentiment
+- Calculates bullish/bearish scores, fear/greed indices, and entity-based sentiment
+- Generates contrarian signals during extreme market sentiment
+
+### 4. Combined Trading Model
+- Located in `src/lib/ml/combinedTradingModel.ts`
+- Integrates technical and sentiment analysis for improved performance
+- Weighted approach to combine different signal sources
+- Supports backtesting and performance evaluation
+
+### 5. Trading Visualization
+- Located in `src/lib/visualization/tradingVisualizer.ts`
+- Creates data structures for visualizing price charts, indicators, and performance
+- Supports equity curves, drawdown analysis, and trade statistics
+- Enables symbol comparison and performance analysis by time period
+
+### Demo
+Check out the demo in `src/examples/combinedModelDemo.ts` for a complete example of how to use all these components together.
+
 ## Environment Variables and Security
 
 This project uses environment variables to store sensitive information like API keys. To keep your keys secure:
